@@ -7,7 +7,9 @@ library(pirParser)
 library(knitr)
 library(rematch2)
 
-# goupil <- write.csv()
+# Load data from latest Goupil export
+
+# goupil <- read.csv("goupil.csv)
 
 # Dimensions: general_dimension_extraction -- not working at the moment
 
