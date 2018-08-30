@@ -7,7 +7,9 @@ library(pirParser)
 library(knitr)
 library(rematch2)
 
-# Dimensions: general_dimension_extraction
+# goupil <- write.csv()
+
+# Dimensions: general_dimension_extraction -- not working at the moment
 
 toy_dimension_parse <- general_dimension_extraction(toy_dimension,
                              dimcol = "dimension",
