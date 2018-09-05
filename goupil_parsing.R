@@ -3,13 +3,14 @@
 # install pirParser package
 #devtools::install_github("thegetty/pirParser")
 
+library(tidyverse)
 library(pirParser)
 library(knitr)
 library(rematch2)
 
 # Load data from latest Goupil export
 
-# goupil <- read.csv("goupil.csv)
+goupil_csv <- read.csv("C:\\Users\\jclements\\Desktop\\GPI_PIR\\GPI_Data_Cleaning\\gpi_data_cleaning\\data\\goupil.csv")
 
 # Dimensions: general_dimension_extraction -- not working at the moment
 
@@ -21,8 +22,11 @@ kable(toy_dimension_parse)
 
 # Prices: parse_prices
 
-toy_money_parse <- parse_prices(toy_money,
-                                amount_col_name = "price",
-                                currency_col_name = "currency",
-                                id_col_name = "id")
+select_goupil <- goupil_csv %>%
+  select(star_no = STAR.Record.No., purch_amount = Purch..Amount, purch_currency = Purch..Currency)
+
+goupil_prices_parsed <- parse_prices(df = select_goupil,
+                                amount_col_name = "purch_amount",
+                                currency_col_name = "purch_currency",
+                                id_col_name = "star_no")
 kable(toy_money_parse)
