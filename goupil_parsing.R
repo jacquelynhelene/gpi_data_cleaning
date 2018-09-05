@@ -7,6 +7,10 @@ library(tidyverse)
 library(pirParser)
 library(knitr)
 library(rematch2)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(magrittr)
 
 # Load data from latest Goupil export
 
@@ -18,6 +22,10 @@ toy_dimension_parse <- general_dimension_extraction(toy_dimension,
                              dimcol = "dimension",
                              idcol = "id",
                              exclusion_col = "exclude")
+# get: 
+# Error: 'bind_re_match' is not an exported object from 'namespace:rematch2'
+# Tried rematch2:::bind_re_match in function code but get errors with pipe_message, etc, which are probably coming from other packages...
+
 kable(toy_dimension_parse)
 
 # Prices: parse_prices
