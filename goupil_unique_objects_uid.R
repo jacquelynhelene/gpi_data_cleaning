@@ -16,13 +16,12 @@ library(stringr)
 library(ggraph)
 library(ggrepel)
 library(igraph)
+library(uuid)
 
 
 # Goupil concordance sheet:
-# TO DO: use "persistent_uid" = "GOUPIL-XXX" numbers (star record numbers)
-# TO DO: Note that there are some stock numbers not inlcuded -- check what is left behind in STAR export CSV
-# TO DO: also check again those "grouped" objects that the sheet is uniting -- put them under goupil_untrustworthy_numbers?
 raw_goupil_stocknumber_concordance <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_stock_no_concordance.csv")
+
 goupil <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil.csv")
 # correct colum names -- look for code for that
 goupil_colnames <- colnames(goupil)
@@ -59,7 +58,7 @@ produce_goupil_stocknumber_concordance <- function(raw_goupil_stocknumber_concor
   sn_components <- igraph::components(sn_graph)
   igraph::V(sn_graph)$component <- sn_components$membership
   goupil_stocknumber_concordance <- igraph::as_data_frame(sn_graph, what = "vertices") %>%
-    rename(star_record_no = name)
+    rename(persistent_uid = name)
   
   goupil_stocknumber_concordance
 }
@@ -67,33 +66,35 @@ produce_goupil_stocknumber_concordance <- function(raw_goupil_stocknumber_concor
 goupil_concordance <- produce_goupil_stocknumber_concordance(raw_goupil_stocknumber_concordance)
 
 ## PRODUCE UNIQUE IDS
-# TO DO: use uuid package
+# from discussions online, seems uuid package cannot be used to batch-generate uuid, so keeping knoedler's method:
 # Produce unique ids for goupil objects based on their stock numbers
 identify_goupil_objects <- function(df, goupil_concordance) {
   df %>%
-    left_join(goupil_concordance, by = "star_record_no") %>%
+    left_join(goupil_concordance, by = "persistent_uid") %>%
     # Because some of the goupil stock numbers changed or were re-used, we
-    # will consult against a stock number concordance that we can use to create
-    # a "functional" stock number - an identifier that connects objects even
+    # will consult against a persistent id concordance that we can use to create
+    # a "functional" id number - an identifier that connects objects even
     # when their nominal stock numbers are different. Those entries without any
     # stock nubmers at all are assumed to be standalone objects, and given a
     # unique id.
     mutate(
       prepped_sn = case_when(
         # When there is no number, generate a unique ID
-        is.na(star_record_no) ~ paste("gennum", as.character(seq_along(nrow(df))), sep = "-"),
+        is.na(persistent_uid) ~ paste("gennum", as.character(seq_along(star_record_no)), sep = "-"),
         # When there is a number that has a prime # replacement from the
         # concordance, use that prime #
         !is.na(component) ~ paste("componentnum", component, sep = "-"),
         # When the original number has no recorded changes, group based on that
         # original number
-        TRUE ~ paste("orignnum", star_record_no, sep = "-"))) %>%
-    mutate(object_id = paste("k", "object", group_indices(., prepped_sn), sep = "-")) %>%
+        TRUE ~ paste("orignnum", persistent_uid, sep = "-"))) %>%
+    mutate(object_id = paste("g", "object", group_indices(., prepped_sn), sep = "-")) %>%
     select(-component, -prepped_sn)
 }
 
 goupil_objects <- identify_goupil_objects(goupil, goupil_concordance)
-
+goupil_objects_upload <- goupil_objects %>%
+  select(persistent_uid, object_id)
+  
 
 ## ORDERING EVENTS
 # For a given object_id, attempt to discern an event order, which can be useful
@@ -119,9 +120,18 @@ order_goupil_object_events <- function(df) {
     # Produce an index per object_id based on this event year/month/day, falling
     # back to position in stock book if there is no year.
     group_by(object_id) %>%
-    arrange(event_year, event_month, event_day, stock_book_no, page_number, row_number, .by_group = TRUE) %>%
-    mutate(event_order = seq_along(star_record_no)) %>%
+    arrange(event_year, event_month, event_day, stock_book_no_1, stock_book_pg_1, stock_book_row_1, .by_group = TRUE) %>%
+    mutate(event_order = seq_along(persistent_uid)) %>%
     ungroup() %>%
     # Remove intermediate columns
     select(-event_year, -event_month, -event_day)
 }
+
+goupil_objects_events <- order_goupil_object_events(goupil_objects)
+
+# csv to upload
+goupil_objects_events_upload <- goupil_objects_events %>%
+  select(persistent_uid, object_id, event_order, pi_record_no)
+
+# first check
+write_csv(goupil_objects_events_upload, "/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload.csv")
