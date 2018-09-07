@@ -31,8 +31,7 @@ goupil_colnames <- goupil_colnames %>%
   str_replace_all("[[:punct:] ]+", "_") %>%
   tolower()
 colnames(goupil) <- goupil_colnames
-goupil <- goupil %>%
-  mutate(star_record_no = as.character(star_record_no))
+
 
 ## IDENTIFY RELATED OBJECTS AND CONNECT THEM VIA COMPONENTS:
 # Editors have compiled links between stocknumbers that actually represent the
@@ -92,9 +91,7 @@ identify_goupil_objects <- function(df, goupil_concordance) {
 }
 
 goupil_objects <- identify_goupil_objects(goupil, goupil_concordance)
-goupil_objects_upload <- goupil_objects %>%
-  select(persistent_uid, object_id)
-  
+
 
 ## ORDERING EVENTS
 # For a given object_id, attempt to discern an event order, which can be useful
@@ -120,7 +117,7 @@ order_goupil_object_events <- function(df) {
     # Produce an index per object_id based on this event year/month/day, falling
     # back to position in stock book if there is no year.
     group_by(object_id) %>%
-    arrange(event_year, event_month, event_day, stock_book_no_1, stock_book_pg_1, stock_book_row_1, .by_group = TRUE) %>%
+    arrange(stock_book_no_1, stock_book_pg_1, stock_book_row_1, event_year, event_month, event_day, .by_group = TRUE) %>%
     mutate(event_order = seq_along(persistent_uid)) %>%
     ungroup() %>%
     # Remove intermediate columns
@@ -133,5 +130,23 @@ goupil_objects_events <- order_goupil_object_events(goupil_objects)
 goupil_objects_events_upload <- goupil_objects_events %>%
   select(persistent_uid, object_id, event_order, pi_record_no)
 
-# first check
+# checks prior to upload
 write_csv(goupil_objects_events_upload, "/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload.csv")
+
+goupil_check <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload.csv")
+roll_up <- function(v, sep = "; ", collapse = TRUE) {
+  if (collapse)
+    v <- sort(unique(v))
+  res <- paste0(na.omit(v), collapse = sep)
+  if (res == "")
+    return(NA_character_)
+  res
+}
+goupil_check %>%
+  group_by(object_id) %>%
+  summarize(n = n(),
+            pir = roll_up(pi_record_no)) %>%
+  sample_n(20, replace = FALSE) %>%
+  View()
+
+#---
