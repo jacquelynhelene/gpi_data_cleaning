@@ -20,9 +20,9 @@ library(uuid)
 
 
 # Goupil concordance sheet:
-raw_goupil_stocknumber_concordance <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_stock_no_concordance.csv")
+raw_goupil_stocknumber_concordance <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_stock_no_concordance.csv") #read from LOD googlesheets
 
-goupil <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil.csv")
+goupil <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil.csv") 
 # correct colum names -- look for code for that
 goupil_colnames <- colnames(goupil)
 goupil_colnames <- goupil_colnames %>%
@@ -103,7 +103,7 @@ goupil_objects <- identify_goupil_objects(goupil, goupil_concordance)
 # inventory events by goupil
 order_goupil_object_events <- function(df) {
   df %>%
-    # Use the entry date as the primary index of event date, falling back to the sale date if the entry date is not available.
+    # Use the entry date as the primary index of event date, falling back to the sale date if the entry date is not available. TOOK OUT  event_year, event_month, event_day
     mutate(
       event_year = case_when(
         is.na(entry_date_year) ~ sale_date_year,
@@ -117,7 +117,7 @@ order_goupil_object_events <- function(df) {
     # Produce an index per object_id based on this event year/month/day, falling
     # back to position in stock book if there is no year.
     group_by(object_id) %>%
-    arrange(stock_book_no_1, stock_book_pg_1, stock_book_row_1, event_year, event_month, event_day, .by_group = TRUE) %>%
+    arrange(stock_book_no_1, stock_book_pg_1, stock_book_row_1, .by_group = TRUE) %>%
     mutate(event_order = seq_along(persistent_uid)) %>%
     ungroup() %>%
     # Remove intermediate columns
