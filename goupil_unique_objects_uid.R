@@ -17,10 +17,18 @@ library(ggraph)
 library(ggrepel)
 library(igraph)
 library(uuid)
+library(googlesheets)
 
 
 # Goupil concordance sheet:
-raw_goupil_stocknumber_concordance <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_stock_no_concordance.csv") #read from LOD googlesheets
+goupil_stocknumber_concordance <- gs_url("https://docs.google.com/spreadsheets/d/1BzYIBz4UR0oQYmclcLZkP3Gsu0QYgrFSG2g0sWWZD9o/edit#gid=601877111")
+raw_goupil_stocknumber_concordance <- gs_read(goupil_stocknumber_concordance)
+
+# correct colum names
+raw_goupil_colnames <- colnames(raw_goupil_stocknumber_concordance)
+raw_goupil_colnames <- raw_goupil_colnames %>%
+  str_replace_all("goupil_", "")
+colnames(raw_goupil_stocknumber_concordance) <- raw_goupil_colnames
 
 goupil <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil.csv") 
 # correct colum names -- look for code for that
@@ -101,52 +109,22 @@ goupil_objects <- identify_goupil_objects(goupil, goupil_concordance)
 # This is called from within identify_goupil_transactions because it is a
 # prerequisite to discerning which entries represent purchases by goupil vs.
 # inventory events by goupil
+# ordering events by book, page and row since, unlike knoedler, in goupil entry dates are 
+# intial entry dates
 order_goupil_object_events <- function(df) {
   df %>%
     # Use the entry date as the primary index of event date, falling back to the sale date if the entry date is not available. TOOK OUT  event_year, event_month, event_day
-    mutate(
-      event_year = case_when(
-        is.na(entry_date_year) ~ sale_date_year,
-        TRUE ~ entry_date_year),
-      event_month = case_when(
-        is.na(entry_date_month) ~ sale_date_month,
-        TRUE ~ entry_date_month),
-      event_day = case_when(
-        is.na(entry_date_day) ~ sale_date_day,
-        TRUE ~ entry_date_day)) %>%
-    # Produce an index per object_id based on this event year/month/day, falling
-    # back to position in stock book if there is no year.
     group_by(object_id) %>%
     arrange(stock_book_no_1, stock_book_pg_1, stock_book_row_1, .by_group = TRUE) %>%
     mutate(event_order = seq_along(persistent_uid)) %>%
-    ungroup() %>%
-    # Remove intermediate columns
-    select(-event_year, -event_month, -event_day)
+    ungroup()
 }
 
 goupil_objects_events <- order_goupil_object_events(goupil_objects)
 
 # csv to upload
-goupil_objects_events_upload <- goupil_objects_events %>%
-  select(persistent_uid, object_id, event_order, pi_record_no)
+goupil_objects_events_upload_final <- goupil_objects_events %>%
+  select(persistent_uid, object_id, event_order)
 
 # checks prior to upload
-write_csv(goupil_objects_events_upload, "/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload.csv")
-
-goupil_check <- read_csv("/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload.csv")
-roll_up <- function(v, sep = "; ", collapse = TRUE) {
-  if (collapse)
-    v <- sort(unique(v))
-  res <- paste0(na.omit(v), collapse = sep)
-  if (res == "")
-    return(NA_character_)
-  res
-}
-goupil_check %>%
-  group_by(object_id) %>%
-  summarize(n = n(),
-            pir = roll_up(pi_record_no)) %>%
-  sample_n(20, replace = FALSE) %>%
-  View()
-
-#---
+write_csv(goupil_objects_events_upload_final, "/Users/svanginhoven/Documents/GPI Projects/gpi_data_cleaning/data/goupil_objects_events_upload_final.csv")
